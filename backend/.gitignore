@@ -1,0 +1,9 @@
+target/
+.env
+.idea/
+.vscode/
+*.class
+*.log
+node_modules/
+_pycache_/
+Chroma_data/
