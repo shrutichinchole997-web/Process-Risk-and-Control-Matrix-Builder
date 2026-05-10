@@ -1,0 +1,85 @@
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: tool68-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-root}
+      POSTGRES_PASSWORD: ${DB_PASS:-root}
+      POSTGRES_DB: ${DB_NAME:-Tool-68}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-root} -d ${DB_NAME:-Tool-68}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: tool68-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mail:
+    image: axllent/mailpit
+    container_name: tool68-mail
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tool68-backend
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-Tool-68}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASS=${DB_PASS:-root}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MAIL_HOST=mail
+      - MAIL_PORT=1025
+      - JWT_SECRET=${JWT_SECRET:-verysecretkeythatisatleast32byteslongforsha256!}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    image: python:3.11-slim
+    container_name: tool68-ai
+    # Mocking AI service for now as there is no folder
+    command: python -c "print('AI Service Started')"
+    ports:
+      - "5000:5000"
+
+  frontend:
+    image: nginx:alpine
+    container_name: tool68-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
